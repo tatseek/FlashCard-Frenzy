@@ -1,5 +1,6 @@
+
 import { NextResponse } from 'next/server'
-import { connectToDatabase } from '@/lib/mongodb'
+import { connectToDatabase, initializeDatabase } from '@/lib/mongodb'
 
 export async function GET() {
   try {
@@ -7,12 +8,19 @@ export async function GET() {
     const games = await db.collection('games').find({ status: 'waiting' }).toArray()
     return NextResponse.json({ games })
   } catch (error) {
-    return NextResponse.json({ error: 'Failed to fetch games' }, { status: 500 })
+    console.error('Error fetching games:', error)
+    return NextResponse.json({ 
+      error: 'Failed to fetch games', 
+      details: error.message 
+    }, { status: 500 })
   }
 }
 
 export async function POST(request) {
   try {
+    // Initialize database if needed (first time setup)
+    await initializeDatabase()
+    
     const { hostId, hostName } = await request.json()
     const { db } = await connectToDatabase()
     
@@ -21,8 +29,8 @@ export async function POST(request) {
     const game = {
       id: gameId,
       hostId,
-      hostName: hostName || 'Anonymous',
-      status: 'waiting', // waiting, playing, finished
+      hostName: hostName || 'Anonymous Host',
+      status: 'waiting',
       players: [{ id: hostId, name: hostName || 'Host', score: 0, ready: false }],
       currentQuestion: 0,
       questions: [],
@@ -36,6 +44,11 @@ export async function POST(request) {
     return NextResponse.json({ gameId, game })
   } catch (error) {
     console.error('Error creating game:', error)
-    return NextResponse.json({ error: 'Failed to create game' }, { status: 500 })
+    return NextResponse.json({ 
+      error: 'Failed to create game', 
+      details: error.message,
+      mongoUri: process.env.MONGODB_URI ? 'URI is set' : 'URI is missing'
+    }, { status: 500 })
   }
 }
+

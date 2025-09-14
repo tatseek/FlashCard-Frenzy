@@ -1,14 +1,21 @@
+
 import { MongoClient } from 'mongodb'
 
 const uri = process.env.MONGODB_URI
-const options = {}
+if (!uri) {
+  throw new Error('Please add your Mongo URI to .env.local')
+}
+
+const options = {
+  maxPoolSize: 10,
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+  //bufferMaxEntries: 0,
+  //bufferCommands: false,
+}
 
 let client
 let clientPromise
-
-if (!process.env.MONGODB_URI) {
-  throw new Error('Please add your Mongo URI to .env.local')
-}
 
 if (process.env.NODE_ENV === 'development') {
   if (!global._mongoClientPromise) {
@@ -24,23 +31,33 @@ if (process.env.NODE_ENV === 'development') {
 export default clientPromise
 
 export async function connectToDatabase() {
-  const client = await clientPromise
-  const db = client.db('flashcard-frenzy')
-  return { client, db }
-}
-// Database Collections
-export const collections = {
-  games: 'games',
-  questions: 'questions',
-  matches: 'matches',
-  scores: 'scores'
+  try {
+    const client = await clientPromise
+    const db = client.db('flashcard-frenzy')
+    
+    // Test the connection
+    await db.admin().ping()
+    console.log(' Connected to MongoDB successfully')
+    
+    return { client, db }
+  } catch (error) {
+    console.error(' Failed to connect to MongoDB:', error)
+    throw error
+  }
 }
 
-// initializing database with sample data
+// Initialize database with sample data
 export async function initializeDatabase() {
   const { db } = await connectToDatabase()
   
-  // sample questions
+  // Check if questions already exist
+  const existingQuestions = await db.collection('questions').countDocuments()
+  if (existingQuestions > 0) {
+    console.log(' Questions already exist, skipping initialization')
+    return
+  }
+  
+  // Sample questions
   const sampleQuestions = [
     {
       question: "What does HTML stand for?",
@@ -77,7 +94,28 @@ export async function initializeDatabase() {
       category: "apis",
       difficulty: "medium"
     },
-   {
+    {
+      question: "What does CSS stand for?",
+      options: ["Computer Style Sheets", "Cascading Style Sheets", "Creative Style Sheets", "Colorful Style Sheets"],
+      correct: 1,
+      category: "web-development",
+      difficulty: "easy"
+    },
+    {
+      question: "Which HTTP method is used to update data?",
+      options: ["GET", "POST", "PUT", "DELETE"],
+      correct: 2,
+      category: "web-apis",
+      difficulty: "easy"
+    },
+    {
+      question: "What is the default port for HTTPS?",
+      options: ["80", "443", "8080", "3000"],
+      correct: 1,
+      category: "networking",
+      difficulty: "medium"
+    },
+    {
       question: "Which of the following uses Graph-based DBMS?",
       options: ["Cassandra", "SQLite", "MySQL", "neo4j"],
       correct: 3,
@@ -105,16 +143,13 @@ export async function initializeDatabase() {
       category: "web-development",
       difficulty: "hard"
     }
-
-
-
-
   ]
   
   try {
-    await db.collection(collections.questions).insertMany(sampleQuestions)
-    console.log('Sample questions inserted')
+    await db.collection('questions').insertMany(sampleQuestions)
+    console.log(' Sample questions inserted successfully')
   } catch (error) {
-    console.log('Questions may already exist:', error.message)
+    console.error('Error inserting sample questions:', error)
   }
 }
+

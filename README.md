@@ -54,7 +54,7 @@ Before you begin, ensure you have the following installed:
 - **Git**
 - **Ubuntu/Linux** (tested on Ubuntu 20.04+)
 
-## 🔧 Installation
+##  Installation
 
 ### 1. Clone the Repository
 ```bash
